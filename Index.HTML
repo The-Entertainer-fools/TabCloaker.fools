@@ -1,7 +1,262 @@
-function showTime() {
-	document.getElementById('currentTime').innerHTML = new Date().toUTCString();
-}
-showTime();
-setInterval(function () {
-	showTime();
-}, 1000);
+
+ <!DOCTYPE html>
+<html style="background: #000 !important; overflow: hidden;">
+<head>
+    <meta charset="UTF-8">
+    <title id="data-meta-1">My Drive - Google Drive</title>
+    <link id="data-meta-2" rel="icon" href="https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png" type="image/x-icon">
+    <style>
+        :root {
+            --prim-hex: #ffae00;
+            --base-hex: #050505;
+            --glow: rgba(255, 174, 0, 0.2);
+        }
+        * { background-color: transparent; box-sizing: border-box; margin: 0; padding: 0; transition: color 0.3s, border-color 0.3s, box-shadow 0.3s, opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        body { background: var(--base-hex) !important; color: #fff !important; font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+       
+        #view-render { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+       
+        #core-wrap {
+            position: relative; z-index: 10; width: 90%; max-width: 420px; text-align: center;
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); padding: 30px;
+            border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.7); box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        body.zen-active #core-wrap, body.zen-active .mod-frame { opacity: 0 !important; pointer-events: none !important; }
+        h1 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 5px; margin-bottom: 20px; color: #555; }
+        #status-ptr { font-size: 0.8rem; color: var(--prim-hex); font-weight: 700; text-transform: uppercase; margin-bottom: 5px; text-shadow: 0 0 10px var(--glow); }
+        #val-out { font-size: 3.5rem; font-weight: 300; font-variant-numeric: tabular-nums; letter-spacing: -2px; }
+        .input-row { display: flex; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 5px; margin-bottom: 15px; }
+        input, textarea { flex: 1; border: none; color: #fff; padding: 10px; outline: none; font-size: 14px; }
+        textarea { width: 100%; background: rgba(255,255,255,0.03); border-radius: 8px; resize: none; font-size: 11px; height: 100px; color: #ccc; border: 1px solid #222; }
+       
+        .exec-trigger { background: var(--prim-hex) !important; color: #000 !important; border: none; padding: 5px 15px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 11px; }
+       
+        .foot-nav { display: flex; justify-content: space-between; margin-top: 15px; font-size: 10px; color: #444; }
+        .nav-btn { cursor: pointer; text-transform: uppercase; padding: 8px; transition: 0.2s; border-radius: 6px; }
+        .nav-btn:hover { color: var(--prim-hex); background: rgba(255,255,255,0.05); }
+        .pop-panel {
+            position: absolute; bottom: 85px; left: 50%; transform: translateX(-50%) scale(0.95);
+            width: 95%; max-width: 380px; background: #0c0c0c; border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px; padding: 20px; opacity: 0; pointer-events: none; z-index: 100; box-shadow: 0 15px 40px rgba(0,0,0,0.9);
+        }
+        .pop-panel.active { opacity: 1; pointer-events: all; transform: translateX(-50%) scale(1); }
+        .panel-title { font-size: 9px; color: #555; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 1px solid #222; padding-bottom: 5px; }
+        .color-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 15px; }
+        .swatch { height: 25px; border-radius: 6px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); }
+        .mod-frame { position: absolute; z-index: 1000; background: rgba(10, 10, 10, 0.95); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; min-width: 220px; display: none; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(10px); }
+        .mod-head { padding: 10px; cursor: move; background: rgba(255, 255, 255, 0.03); border-radius: 12px 12px 0 0; font-size: 9px; color: var(--prim-hex); display: flex; justify-content: space-between; align-items: center; }
+        .mod-body { padding: 12px; font-size: 11px; color: #aaa; }
+       
+        #traffic-log { height: 85px; overflow: hidden; font-family: monospace; font-size: 9px; color: var(--prim-hex); line-height: 1.4; background: #000; padding: 5px; border-radius: 4px; }
+        .cal-day { padding: 4px; border: 1px solid #222; text-align: center; font-size: 10px; }
+        .cal-today { background: var(--prim-hex) !important; color: #000 !important; font-weight: bold; }
+        #sec-layer { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.98); z-index: 2000; justify-content: center; align-items: center; flex-direction: column; }
+    </style>
+</head>
+<body>
+<canvas id="view-render"></canvas>
+<div id="sec-layer">
+    <div id="sec-node" style="text-align: center;">
+        <h2 style="font-size: 11px; color: #444; letter-spacing: 2px;">ENCRYPTED_VAULT</h2>
+        <input type="password" id="auth-key" placeholder="KEY..." style="background: #111; border: 1px solid #333; margin-top:15px; text-align: center; border-radius: 8px;">
+        <button class="exec-trigger" style="width: 100%; margin-top:10px;" onclick="sys_auth()">DECRYPT</button>
+        <div class="nav-btn" style="margin-top: 10px;" onclick="sys_close()">CANCEL</div>
+    </div>
+    <div id="sec-data" style="display:none; text-align: center;">
+        <p id="out-str" style="color: var(--prim-hex); font-size: 12px; border: 1px solid #333; padding: 20px; min-width: 200px;"></p>
+        <button class="exec-trigger" style="margin-top: 15px;" onclick="sys_lock()">RELOCK</button>
+    </div>
+</div>
+<div id="mod-task" class="mod-frame" style="top: 5%; left: 5%;">
+    <div class="mod-head"><span>TASK_QUEUE</span><span style="cursor:pointer" onclick="sys_mod_toggle('mod-task')">×</span></div>
+    <div class="mod-body">
+        <div id="task-list" style="max-height:80px; overflow:auto; margin-bottom:10px;"></div>
+        <div class="input-row" style="margin-bottom:0;"><input type="text" id="task-in" placeholder="Task..."><button class="exec-trigger" onclick="add_task()">+</button></div>
+    </div>
+</div>
+<div id="mod-pomo" class="mod-frame" style="top: 5%; right: 5%;">
+    <div class="mod-head"><span>FOCUS_TIMER</span><span style="cursor:pointer" onclick="sys_mod_toggle('mod-pomo')">×</span></div>
+    <div class="mod-body" style="text-align:center;">
+        <div id="pomo-out" style="font-size:24px; margin-bottom:10px; color:var(--prim-hex);">25:00</div>
+        <div style="display:flex; gap:5px; justify-content:center; margin-bottom:10px;">
+            <button class="exec-trigger" onclick="pomo_set(5)">5m</button>
+            <button class="exec-trigger" onclick="pomo_set(25)">25m</button>
+            <button class="exec-trigger" onclick="pomo_set(50)">50m</button>
+        </div>
+        <button class="exec-trigger" onclick="pomo_start()" style="width:100%">START</button>
+    </div>
+</div>
+<div id="mod-notes" class="mod-frame" style="top: 40%; right: 5%;">
+    <div class="mod-head"><span>SCRATCHPAD</span><span style="cursor:pointer" onclick="sys_mod_toggle('mod-notes')">×</span></div>
+    <div class="mod-body"><textarea id="note-area" placeholder="Write here..."></textarea></div>
+</div>
+<div id="mod-calc" class="mod-frame" style="top: 40%; left: 5%;">
+    <div class="mod-head"><span>MATH_PROC</span><span style="cursor:pointer" onclick="sys_mod_toggle('mod-calc')">×</span></div>
+    <div class="mod-body">
+        <input type="text" id="calc-display" readonly style="width:100%; background:#000; color:var(--prim-hex); border:1px solid #222; text-align:right; padding:8px; margin-bottom:8px;">
+        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:6px;">
+            <button class="exec-trigger" onclick="calc_add('7')">7</button><button class="exec-trigger" onclick="calc_add('8')">8</button><button class="exec-trigger" onclick="calc_add('9')">9</button><button class="exec-trigger" onclick="calc_add('/')">/</button>
+            <button class="exec-trigger" onclick="calc_add('4')">4</button><button class="exec-trigger" onclick="calc_add('5')">5</button><button class="exec-trigger" onclick="calc_add('6')">6</button><button class="exec-trigger" onclick="calc_add('*')">×</button>
+            <button class="exec-trigger" onclick="calc_add('1')">1</button><button class="exec-trigger" onclick="calc_add('2')">2</button><button class="exec-trigger" onclick="calc_add('3')">3</button><button class="exec-trigger" onclick="calc_add('-')">-</button>
+            <button class="exec-trigger" onclick="calc_add('0')">0</button><button class="exec-trigger" onclick="calc_add('.')">.</button><button class="exec-trigger" onclick="calc_eval()">=</button><button class="exec-trigger" onclick="calc_add('+')">+</button>
+        </div>
+    </div>
+</div>
+<div id="mod-cal" class="mod-frame" style="bottom: 5%; left: 5%;">
+    <div class="mod-head"><span>SYSTEM_CAL</span><span style="cursor:pointer" onclick="sys_mod_toggle('mod-cal')">×</span></div>
+    <div class="mod-body">
+        <div id="cal-mth" style="text-align:center; font-weight:bold; color:var(--prim-hex); margin-bottom:5px; font-size:10px;"></div>
+        <div id="cal-grid" style="display:grid; grid-template-columns: repeat(7,1fr); gap:2px;"></div>
+    </div>
+</div>
+<div id="mod-traffic" class="mod-frame" style="bottom: 5%; right: 5%;">
+    <div class="mod-head"><span>TRAFFIC_MON</span><span style="cursor:pointer" onclick="sys_mod_toggle('mod-traffic')">×</span></div>
+    <div class="mod-body"><div id="traffic-log"></div></div>
+</div>
+<div id="core-wrap">
+    <h1>GHOST_CONSOLE_V5.5</h1>
+    <div id="metrics-frame"><div id="status-ptr">SYNC_IDLE</div><div id="val-out">00:00:00</div></div>
+    <div class="input-row">
+        <input type="text" id="uri-val" placeholder="URI CLOAK..." autocomplete="off" onkeydown="if(event.key==='Enter') sys_init()">
+        <button class="exec-trigger" onclick="sys_init()">></button>
+    </div>
+   
+    <div class="foot-nav">
+        <div class="nav-btn" onclick="sys_switch('panel-identity')">ID</div>
+        <div class="nav-btn" onclick="sys_switch('panel-modules')">MODS</div>
+        <div class="nav-btn" onclick="sys_mode()">ZEN</div>
+        <div class="nav-btn" onclick="sys_switch('panel-visuals')">VISUALS</div>
+    </div>
+    <div id="panel-visuals" class="pop-panel">
+        <div class="panel-title">UI Theme</div>
+        <div class="color-grid">
+            <div class="swatch" style="background:#ffae00" onclick="set_theme('#ffae00', 'rgba(255,174,0,0.2)')"></div>
+            <div class="swatch" style="background:#00f2ff" onclick="set_theme('#00f2ff', 'rgba(0,242,255,0.2)')"></div>
+            <div class="swatch" style="background:#39ff14" onclick="set_theme('#39ff14', 'rgba(57,255,20,0.2)')"></div>
+            <div class="swatch" style="background:#ff004c" onclick="set_theme('#ff004c', 'rgba(255,0,76,0.2)')"></div>
+        </div>
+        <div class="panel-title">Engine Visuals</div>
+        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:10px;">
+            <div class="nav-btn" style="font-size:8px; border:1px solid #333;" onclick="set_fx('v1')">GALAXY</div>
+            <div class="nav-btn" style="font-size:8px; border:1px solid #333;" onclick="set_fx('v2')">AURORA</div>
+            <div class="nav-btn" style="font-size:8px; border:1px solid #333;" onclick="set_fx('v3')">MATRIX</div>
+            <div class="nav-btn" style="font-size:8px; border:1px solid #333;" onclick="set_fx('v5')">NEBULA</div>
+            <div class="nav-btn" style="font-size:8px; border:1px solid #333;" onclick="set_fx('v6')">GRID</div>
+            <div class="nav-btn" style="font-size:8px; border:1px solid #333;" onclick="set_fx('v4')">DARK</div>
+        </div>
+        <hr style="border:0; border-top:1px solid #222; margin:15px 0;">
+        <div class="nav-btn" style="text-align:center; color:var(--prim-hex);" onclick="sys_open()">OPEN_VAULT</div>
+    </div>
+    <div id="panel-identity" class="pop-panel">
+        <div class="panel-title">Identity Pointer</div>
+        <div class="nav-btn" onclick="set_ptr('p1')">Google Drive</div>
+        <div class="nav-btn" onclick="set_ptr('p2')">Gmail</div>
+        <div class="nav-btn" onclick="set_ptr('p3')">Wikipedia</div>
+        <div class="nav-btn" onclick="set_ptr('p4')">Desmos Calculator</div>
+    </div>
+    <div id="panel-modules" class="pop-panel">
+        <div class="panel-title">Active Modules</div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div class="nav-btn" onclick="sys_mod_toggle('mod-task')">Tasks</div>
+            <div class="nav-btn" onclick="sys_mod_toggle('mod-pomo')">Timer</div>
+            <div class="nav-btn" onclick="sys_mod_toggle('mod-cal')">Calendar</div>
+            <div class="nav-btn" onclick="sys_mod_toggle('mod-traffic')">Traffic</div>
+            <div class="nav-btn" onclick="sys_mod_toggle('mod-calc')">Math Proc</div>
+            <div class="nav-btn" onclick="sys_mod_toggle('mod-notes')">Scratchpad</div>
+        </div>
+    </div>
+</div>
+<script>
+    const data_pts = [{n:"1st Hour",s:"07:35",e:"08:24"},{n:"Advisory",s:"08:24",e:"08:51"},{n:"2nd Hour",s:"08:56",e:"09:45"},{n:"3rd Hour",s:"09:45",e:"10:34"},{n:"4th Hour",s:"10:34",e:"11:23"},{n:"5th Hour",s:"11:23",e:"12:12"},{n:"Lunch",s:"12:12",e:"12:51"},{n:"6th Hour",s:"12:51",e:"13:40"},{n:"7th Hour",s:"13:40",e:"14:30"}];
+    const cfg_map = {p1:{t:'My Drive - Google Drive',i:'https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_32dp.png'},p2:{t:'Inbox - Gmail',i:'https://ssl.gstatic.com/ui/v1/icons/mail/images/favicon5.ico'},p3:{t:'Wikipedia',i:'https://en.wikipedia.org/favicon.ico'},p4:{t:'Desmos | Graphing Calculator',i:'https://www.desmos.com/favicon.ico'}};
+    const canvas = document.getElementById('view-render'); const ctx = canvas.getContext('2d'); let v_id;
+    const stars = Array.from({length:100},()=>({x:Math.random(),y:Math.random(),v:Math.random()*0.0006 + 0.0002, s:Math.random()*Math.PI*2}));
+    const fx_lib = {
+        v1: () => (t) => { ctx.fillStyle='#000'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle='#fff'; stars.forEach(s=>{ ctx.fillRect(s.x*canvas.width, s.y*canvas.height, 1, 1); s.y+=s.v; if(s.y>1) s.y=0; }); },
+        v2: () => (t) => {
+            ctx.fillStyle='#02040a'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.globalCompositeOperation='lighter';
+            for(let i=0;i<2;i++) { const g=ctx.createRadialGradient(canvas.width/2+Math.sin(t*0.001+i)*100, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width); g.addColorStop(0, 'rgba(0,100,255,0.1)'); g.addColorStop(1,'transparent'); ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height); }
+            ctx.globalCompositeOperation='source-over'; ctx.fillStyle='#fff'; stars.forEach(s=>{ let ox = s.x*canvas.width + (Math.sin(t*0.001 + s.s)*15); ctx.fillRect(ox, s.y*canvas.height, 1, 1); s.y+=s.v*0.5; if(s.y>1) s.y=0; });
+        },
+        v3: () => { const cols=Math.floor(canvas.width/20), dr=Array(cols).fill(0); return () => { ctx.fillStyle='rgba(0,0,0,0.1)'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--prim-hex'); ctx.font="15px monospace"; dr.forEach((y,i)=>{ ctx.fillText(String.fromCharCode(Math.random()*128),i*20,y); if(y>canvas.height&&Math.random()>0.98) dr[i]=0; else dr[i]+=15; }); }; },
+        v4: () => (t) => { ctx.fillStyle='#050505'; ctx.fillRect(0,0,canvas.width,canvas.height); },
+        v5: () => (t) => { // NEBULA
+            ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            for(let x = 0; x <= 1; x++) {
+                const g = ctx.createRadialGradient(canvas.width/2 + Math.cos(t*0.0005) * (canvas.width/3), canvas.height/2 + Math.sin(t*0.0005) * (canvas.height/3), 0, canvas.width/2, canvas.height/2, canvas.width);
+                g.addColorStop(0, 'rgba(150, 0, 255, 0.15)'); g.addColorStop(1, 'transparent');
+                ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+        },
+        v6: () => (t) => { // GRID
+            ctx.fillStyle = '#050505'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--prim-hex');
+            ctx.lineWidth = 0.5; ctx.globalAlpha = 0.2;
+            const speed = (t * 0.05) % 40;
+            for(let i = 0; i < canvas.width; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
+            for(let i = speed; i < canvas.height; i += 40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke(); }
+            ctx.globalAlpha = 1.0;
+        }
+    };
+    function set_fx(t) { cancelAnimationFrame(v_id); const run=fx_lib[t](); const loop=(ts)=>{run(ts); v_id=requestAnimationFrame(loop);}; v_id=requestAnimationFrame(loop); }
+    function set_theme(p, g) { document.documentElement.style.setProperty('--prim-hex', p); document.documentElement.style.setProperty('--glow', g); build_cal(); }
+    function sys_mode() { document.body.classList.toggle('zen-active'); }
+    window.addEventListener('keydown', (e) => { if(e.key === '>') sys_mode(); });
+    function sys_init(){
+        let v = document.getElementById('uri-val').value;
+        if(!v) return;
+        if(!v.startsWith('http')) v = 'https://' + v;
+        const curTab = document.getElementById('data-meta-1').innerText;
+        const curIcon = document.getElementById('data-meta-2').href;
+        const win = window.open('about:blank', '_blank');
+        win.document.write(`<html><head><title>${curTab}</title><link rel="icon" href="${curIcon}"><style>body,html{margin:0;padding:0;height:100%;overflow:hidden;} iframe{width:100%;height:100%;border:none;}</style></head><body><iframe src="${v}"></iframe></body></html>`);
+    }
+    function sys_switch(id) { document.querySelectorAll('.pop-panel').forEach(p => p.id === id ? p.classList.toggle('active') : p.classList.remove('active')); }
+    function sys_mod_toggle(id) { const el=document.getElementById(id); el.style.display=(el.style.display==='block')?'none':'block'; if(el.style.display==='block') { makeDraggable(el); if(id==='mod-cal') build_cal(); } sys_switch(null); }
+    function makeDraggable(el) { const h=el.querySelector('.mod-head'); h.onmousedown=(e)=>{ let p3=e.clientX, p4=e.clientY; document.onmouseup=()=>{document.onmouseup=null; document.onmousemove=null;}; document.onmousemove=(e)=>{ let p1=p3-e.clientX, p2=p4-e.clientY; p3=e.clientX; p4=e.clientY; el.style.top=(el.offsetTop-p2)+"px"; el.style.left=(el.offsetLeft-p1)+"px"; }; }; }
+    function sys_auth(){ if(document.getElementById('auth-key').value==='pioneer'){ document.getElementById('out-str').innerText="Jackson is a Bum."; document.getElementById('sec-node').style.display='none'; document.getElementById('sec-data').style.display='block'; } }
+    function sys_open(){document.getElementById('sec-layer').style.display='flex'; sys_switch(null);}
+    function sys_close(){document.getElementById('sec-layer').style.display='none'; sys_lock();}
+    function sys_lock(){document.getElementById('auth-key').value=''; document.getElementById('sec-node').style.display='block'; document.getElementById('sec-data').style.display='none';}
+    function calc_add(v){document.getElementById('calc-display').value+=v;}
+    function calc_eval(){try{document.getElementById('calc-display').value=eval(document.getElementById('calc-display').value.replace('×', '*'));}catch{document.getElementById('calc-display').value="ERR";}}
+    function set_ptr(p){const c=cfg_map[p]; document.getElementById('data-meta-1').innerText=c.t; document.getElementById('data-meta-2').href=c.i; sys_switch(null);}
+   
+    let pI, timeLeft=1500;
+    function pomo_set(m){timeLeft=m*60; pomo_disp(); clearInterval(pI);}
+    function pomo_disp(){const m=Math.floor(timeLeft/60), s=timeLeft%60; document.getElementById('pomo-out').innerText=`${m}:${s<10?'0':''}${s}`;}
+    function pomo_start(){clearInterval(pI); pI=setInterval(()=>{if(timeLeft>0){timeLeft--;pomo_disp();}else clearInterval(pI);},1000);}
+    function add_task() { const i = document.getElementById('task-in'); if(!i.value) return; const d = document.createElement('div'); d.style.fontSize='10px'; d.style.marginBottom='4px'; d.innerHTML=`<input type="checkbox"> ${i.value}`; document.getElementById('task-list').appendChild(d); i.value=''; }
+   
+    function build_cal(){
+        const d=new Date(),m=d.getMonth(),y=d.getFullYear(),today=d.getDate();
+        document.getElementById('cal-mth').innerText=new Intl.DateTimeFormat('en-US',{month:'long',year:'numeric'}).format(d);
+        const g=document.getElementById('cal-grid'); g.innerHTML='';
+        const f=new Date(y,m,1).getDay(),l=new Date(y,m+1,0).getDate();
+        for(let i=0;i<f;i++) g.appendChild(document.createElement('div'));
+        for(let i=1;i<=l;i++){
+            const c=document.createElement('div'); c.className='cal-day'+(i===today?' cal-today':''); c.innerText=i; g.appendChild(c);
+        }
+    }
+    setInterval(() => {
+        const log = document.getElementById('traffic-log');
+        if(log && document.getElementById('mod-traffic').style.display === 'block') {
+            const entry = document.createElement('div'); entry.innerText = `[${new Date().toLocaleTimeString()}] PING_ACK -> 10.0.0.8`;
+            log.prepend(entry); if(log.children.length > 5) log.lastChild.remove();
+        }
+    }, 2500);
+    window.onresize=()=>{canvas.width=window.innerWidth; canvas.height=window.innerHeight;}; window.onresize();
+    set_fx('v1');
+    setInterval(() => {
+        const n=new Date(), c=n.getHours()*60+n.getMinutes();
+        const cur=data_pts.find(p=>{const [sH,sM]=p.s.split(':').map(Number),[eH,eM]=p.e.split(':').map(Number); return c>=(sH*60+sM) && c<(eH*60+eM);});
+        if(cur){
+            const [eH,eM]=cur.e.split(':').map(Number); const t=new Date(); t.setHours(eH,eM,0);
+            const df=t-n; document.getElementById('status-ptr').innerText=cur.n;
+            document.getElementById('val-out').innerText=`${Math.floor(df/60000)}:${String(Math.floor((df%60000)/1000)).padStart(2,'0')}`;
+        }
+    },1000);
+</script>
+</body>
+</html>
